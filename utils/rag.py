@@ -53,7 +53,7 @@ def get_llm(api_key: str) -> ChatOpenAI:
         openai_api_key=api_key,
         model="gpt-4o-mini",
         temperature=0.3,
-        max_tokens=1000
+        max_tokens=2000
     )
 
 
@@ -68,8 +68,8 @@ def load_vectorstore(vectorstore_path: str, embeddings: OpenAIEmbeddings) -> FAI
 def create_qa_chain(vectorstore: FAISS, llm: ChatOpenAI) -> dict:
     """Retorna um dict com o retriever e o LLM prontos para uso conversacional."""
     retriever = vectorstore.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": 6}
+        search_type="mmr",          # diversidade: evita k trechos do mesmo artigo
+        search_kwargs={"k": 10, "fetch_k": 25, "lambda_mult": 0.6}
     )
     return {"retriever": retriever, "llm": llm}
 
@@ -83,8 +83,8 @@ def _format_history(messages: list) -> str:
         role = "Usuário" if msg["role"] == "user" else "Assistente"
         # Trunca respostas longas para não explodir o contexto
         content = msg["content"]
-        if len(content) > 600:
-            content = content[:600] + "…"
+        if len(content) > 1200:
+            content = content[:1200] + "…"
         lines.append(f"{role}: {content}")
     return "\n".join(lines) + "\n\n"
 
