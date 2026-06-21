@@ -416,15 +416,48 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "qa_chain" not in st.session_state:
     st.session_state.qa_chain = None
+if "article_sources" not in st.session_state:
+    st.session_state.article_sources = []
+if "active_key" not in st.session_state:
+    st.session_state.active_key = None  # chave em uso (detectar trocas)
 
 # ── Sidebar ─────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## :material/menu_book: Artigos Indexados")
-
-    st.markdown("---")
-    st.markdown(":material/description: **43 artigos** carregados")
+    st.markdown("## :material/menu_book: Base de Conhecimento")
     st.markdown(":material/smart_toy: Modelo: `gpt-4o`")
     st.markdown(":material/hub: Embeddings: `text-embedding-3-small`")
+
+    st.markdown("---")
+
+    # Chave de API do usuário
+    st.markdown(":material/key: **Sua chave OpenAI** *(opcional)*")
+    user_key_input = st.text_input(
+        "Chave OpenAI",
+        type="password",
+        placeholder="sk-... (deixe vazio para usar a padrão)",
+        label_visibility="collapsed",
+        key="user_api_key_input"
+    )
+    user_key = user_key_input.strip()
+    effective_key = user_key if user_key.startswith("sk-") else API_KEY
+
+    # Invalida a chain se a chave mudou
+    if effective_key != st.session_state.active_key:
+        st.session_state.qa_chain = None
+        st.session_state.active_key = effective_key
+
+    st.markdown("---")
+
+    # Lista de artigos indexados
+    if st.session_state.article_sources:
+        with st.expander(
+            f"Artigos indexados ({len(st.session_state.article_sources)})",
+            icon=":material/description:"
+        ):
+            for art in st.session_state.article_sources:
+                st.markdown(f"- {art}")
+    else:
+        st.markdown(":material/description: Carregando artigos...")
 
     st.markdown("---")
     with st.expander("Sobre este Chatbot", icon=":material/info:"):
@@ -435,19 +468,12 @@ with st.sidebar:
         Utiliza **RAG** (*Retrieval-Augmented Generation*)
         para buscar trechos relevantes dos artigos
         e responder com embasamento científico.
-
-        **Principais autores:**
-        - Belk, Hofstede, Schmitt
-        - Bargh, McCracken, Kozinets
-        - Holbrook & Hirschman
-        - Pine & Gilmore
-        - E muitos outros clássicos da área.
         """)
 
     st.markdown("---")
     if st.button("Limpar conversa", icon=":material/delete:", use_container_width=True):
         st.session_state.messages = []
-        st.session_state.qa_chain = None  # força reconexão
+        st.session_state.qa_chain = None
         st.rerun()
 
 # ── Cabeçalho ───────────────────────────────────────────────────────────
@@ -469,10 +495,18 @@ if not os.path.exists(VECTORSTORE_DIR):
 if st.session_state.qa_chain is None:
     try:
         with st.spinner("Conectando à base de conhecimento..."):
-            embeddings = get_embeddings(API_KEY)
+            embeddings = get_embeddings(effective_key)
             vectorstore = load_vectorstore(VECTORSTORE_DIR, embeddings)
-            llm = get_llm(API_KEY)
+            llm = get_llm(effective_key)
             st.session_state.qa_chain = create_qa_chain(vectorstore, llm)
+            # Extrai nomes dos artigos para exibir na sidebar
+            if not st.session_state.article_sources:
+                st.session_state.article_sources = sorted(set(
+                    doc.metadata.get("source", "")
+                    for doc in vectorstore.docstore._dict.values()
+                    if doc.metadata.get("source")
+                ))
+                st.rerun()
     except Exception as e:
         st.error(f"Erro ao conectar: {e}")
         st.stop()
@@ -547,45 +581,3 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
     st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)
-
-# ── Sugestões iniciais ──────────────────────────────────────────────────
-if len(st.session_state.messages) == 0:
-    st.markdown(
-        '<div class="suggestions-title">'
-        '<span class="material-symbols-rounded">lightbulb</span> Comece perguntando...</div>',
-        unsafe_allow_html=True
-    )
-
-    col1, col2, col3 = st.columns(3, gap="medium")
-    suggestions = [
-        {
-            "title": "Extended Self",
-            "question": "O que é o 'extended self' de Belk e como se aplica ao mundo digital?",
-            "icon": ":material/extension:"
-        },
-        {
-            "title": "Subconsciente",
-            "question": "Como o inconsciente influencia as decisões de compra segundo Bargh?",
-            "icon": ":material/psychology:"
-        },
-        {
-            "title": "Cultura",
-            "question": "Qual a relação entre cultura e consumo segundo McCracken?",
-            "icon": ":material/public:"
-        }
-    ]
-
-    for col, sug in zip([col1, col2, col3], suggestions):
-        with col:
-            if st.button(
-                sug["title"],
-                icon=sug["icon"],
-                use_container_width=True,
-                key=f"sug_{sug['title']}"
-            ):
-                st.session_state.messages.append({
-                    "role": "user",
-                    "avatar": USER_AVATAR,
-                    "content": sug["question"]
-                })
-                st.rerun()
