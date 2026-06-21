@@ -560,6 +560,53 @@ for msg in st.session_state.messages:
         if msg.get("sources"):
             render_sources(msg["sources"])
 
+# Sugestões iniciais — exibidas apenas quando o chat está vazio
+if len(st.session_state.messages) == 0:
+    st.markdown("""
+    <div class="suggestions-title">
+        <span class="material-symbols-rounded">lightbulb</span>
+        Sugestões para desenvolver seu artigo
+    </div>
+    """, unsafe_allow_html=True)
+
+    SUGGESTIONS = [
+        (
+            ":material/search: Quais temas posso explorar nesta base?",
+            "Quais assuntos e temas podem ser explorados com base nos artigos indexados? Faça um panorama das principais áreas cobertas pela literatura."
+        ),
+        (
+            ":material/science: Lacunas de pesquisa existentes",
+            "Quais lacunas de pesquisa existem na literatura indexada sobre comportamento do consumidor? Onde há oportunidade para novos estudos?"
+        ),
+        (
+            ":material/edit_note: Sugira um tema de artigo original",
+            "Sugira um tema de artigo científico original que eu poderia desenvolver com base nos artigos desta base de conhecimento, justificando sua relevância."
+        ),
+        (
+            ":material/bar_chart: Metodologias mais utilizadas",
+            "Quais metodologias de pesquisa (quantitativas, qualitativas, experimentos, surveys etc.) são mais utilizadas nos artigos desta base e em quais contextos?"
+        ),
+        (
+            ":material/account_tree: Teorias mais abordadas",
+            "Quais teorias e modelos teóricos do comportamento do consumidor aparecem com mais frequência nos artigos indexados? Explique cada uma brevemente."
+        ),
+        (
+            ":material/schema: Proponha um framework conceitual",
+            "Proponha um framework conceitual integrando as principais teorias e achados dos artigos indexados sobre comportamento do consumidor, adequado para um artigo científico."
+        ),
+    ]
+
+    col1, col2 = st.columns(2)
+    for i, (label, question) in enumerate(SUGGESTIONS):
+        with (col1 if i % 2 == 0 else col2):
+            if st.button(label, key=f"sug_{i}", use_container_width=True):
+                st.session_state.messages.append({
+                    "role": "user",
+                    "avatar": USER_AVATAR,
+                    "content": question
+                })
+                st.rerun()
+
 # Captura nova pergunta digitada
 if prompt := st.chat_input("Pergunte sobre os artigos..."):
     if st.session_state.qa_chain is None:
