@@ -23,9 +23,16 @@ from utils.rag import (
     answer_question
 )
 
-# ── API Key (secrets > env > fallback) ──────────────────────────────────
+# ── Configuração da página — deve vir ANTES de qualquer st.* call ──────
+st.set_page_config(
+    page_title="Chatbot • Comportamento do Consumidor",
+    page_icon=":material/psychology:",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ── API Key (secrets > env > erro) ────────────────────────────────────
 def get_api_key() -> str:
-    """Obtém a chave de forma segura: st.secrets > .env > erro."""
     try:
         return st.secrets["OPENAI_API_KEY"]
     except Exception:
@@ -33,19 +40,11 @@ def get_api_key() -> str:
     key = os.getenv("OPENAI_API_KEY", "")
     if key:
         return key
-    st.error("Chave OpenAI não encontrada. Configure `.streamlit/secrets.toml` ou `.env`.",
+    st.error("Chave OpenAI não encontrada. Configure os Secrets no Streamlit Cloud.",
              icon=":material/key:")
     st.stop()
 
 API_KEY = get_api_key()
-
-# ── Configuração da página ─────────────────────────────────────────────
-st.set_page_config(
-    page_title="Chatbot • Comportamento do Consumidor",
-    page_icon=":material/psychology:",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # ── CSS personalizado (alto contraste, moderno) ────────────────────────
 st.markdown("""
