@@ -28,7 +28,7 @@ st.set_page_config(
     page_title="Chatbot • Comportamento do Consumidor",
     page_icon=":material/psychology:",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
 # ── API Key (secrets > env > erro) ────────────────────────────────────
@@ -353,11 +353,60 @@ st.markdown("""
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
     /* ================================================================
-       RESPONSIVE
+       RESPONSIVE — tablet (≤1024px)
        ================================================================ */
-    @media (max-width: 640px) {
-        .main-header h1 { font-size: 1.8rem; }
-        .main-header h1 .material-symbols-rounded { font-size: 1.8rem; }
+    @media (max-width: 1024px) {
+        .main-header h1 { font-size: 2rem; }
+        .chat-container { padding: 0.75rem; }
+    }
+
+    /* ================================================================
+       RESPONSIVE — mobile (≤768px)
+       ================================================================ */
+    @media (max-width: 768px) {
+        /* Cabeçalho */
+        .main-header { padding: 1.2rem 0.75rem 0.4rem; }
+        .main-header h1 {
+            font-size: 1.5rem;
+            letter-spacing: -0.02em;
+        }
+        .main-header h1 .material-symbols-rounded { font-size: 1.5rem; }
+        .main-header .subtitle { font-size: 0.82rem; }
+
+        /* Chat ocupa largura total */
+        .chat-container { padding: 0.5rem 0.25rem; }
+        [data-testid="stChatMessageContent"][aria-label*="from user"],
+        [data-testid="stChatMessageContent"][aria-label*="from assistant"] {
+            padding: 10px 14px !important;
+            font-size: 0.9rem !important;
+        }
+
+        /* Input */
+        [data-testid="stChatInput"] { border-radius: 12px !important; }
+        [data-testid="stChatInput"] textarea { font-size: 0.92rem !important; }
+
+        /* Botões de sugestão — tamanho menor */
+        .stButton > button {
+            font-size: 0.82rem !important;
+            padding: 10px 12px !important;
+        }
+
+        /* Colunas de sugestão empilham em coluna única */
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+
+        /* Título das sugestões */
+        .suggestions-title {
+            font-size: 0.92rem;
+            margin: 1rem 0.25rem 0.5rem;
+        }
+
+        /* Expander de fontes */
+        [data-testid="stExpander"] summary {
+            font-size: 0.82rem !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
