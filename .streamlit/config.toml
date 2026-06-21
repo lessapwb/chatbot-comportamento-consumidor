@@ -1,0 +1,22 @@
+[client]
+showErrorDetails = true
+toolbarMode = "auto"
+
+[theme]
+# Tema fixo em CLARO — sem isso o app segue o modo do SO (escuro),
+# deixando o texto branco sobre o fundo claro (invisível).
+base = "light"
+primaryColor = "#2563eb"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f1f5f9"
+textColor = "#0f172a"
+
+[server]
+port = 8501
+headless = false
+runOnSave = true
+maxUploadSize = 200
+enableXsrfProtection = true
+
+[logger]
+level = "info"
