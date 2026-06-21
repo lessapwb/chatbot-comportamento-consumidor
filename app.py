@@ -7,6 +7,7 @@ comportamento do consumidor usando RAG (Retrieval-Augmented Generation).
 Execute com: streamlit run app.py
 """
 import os
+import re
 import sys
 import streamlit as st
 from dotenv import load_dotenv
@@ -204,10 +205,17 @@ st.markdown("""
         background: rgba(96, 165, 250, 0.08) !important;
         border: 1px solid rgba(96, 165, 250, 0.25) !important;
     }
+    /* Título do expander (summary) precisa de override explícito no fundo escuro */
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary,
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary p,
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary span {
+        color: #e2e8f0 !important;
+        font-size: 0.85rem !important;
+    }
     [data-testid="stSidebar"] [data-testid="stExpander"] p,
     [data-testid="stSidebar"] [data-testid="stExpander"] li {
         color: #cbd5e1 !important;
-        font-size: 0.85rem;
+        font-size: 0.83rem;
     }
     [data-testid="stSidebar"] hr {
         border-color: rgba(255, 255, 255, 0.12) !important;
@@ -241,13 +249,21 @@ st.markdown("""
     [data-testid="stChatInput"] textarea::placeholder {
         color: #64748b !important;
     }
-    /* Botão de envio — sem dimensões fixas, só estilo */
-    [data-testid="stChatInputSubmitButton"] {
-        color: #2563eb !important;
+    /* Botão de envio: ícone branco sobre fundo azul quando ativo */
+    [data-testid="stChatInputSubmitButton"] button {
+        border-radius: 10px !important;
+        transition: opacity 0.2s ease !important;
     }
-    [data-testid="stChatInputSubmitButton"]:hover:not(:disabled) {
-        color: #1d4ed8 !important;
-        background: rgba(37, 99, 235, 0.1) !important;
+    [data-testid="stChatInputSubmitButton"] button:not(:disabled) {
+        background: #2563eb !important;
+    }
+    [data-testid="stChatInputSubmitButton"] button:not(:disabled) span,
+    [data-testid="stChatInputSubmitButton"] button:not(:disabled) svg {
+        color: #ffffff !important;
+        fill: #ffffff !important;
+    }
+    [data-testid="stChatInputSubmitButton"] button:disabled {
+        opacity: 0.35 !important;
     }
 
     /* ================================================================
@@ -424,7 +440,7 @@ if "active_key" not in st.session_state:
 # ── Sidebar ─────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## :material/menu_book: Base de Conhecimento")
-    st.markdown(":material/smart_toy: Modelo: `gpt-4o`")
+    st.markdown(":material/smart_toy: Modelo: `gpt-4o-mini`")
     st.markdown(":material/hub: Embeddings: `text-embedding-3-small`")
 
     st.markdown("---")
@@ -501,11 +517,18 @@ if st.session_state.qa_chain is None:
             st.session_state.qa_chain = create_qa_chain(vectorstore, llm)
             # Extrai nomes dos artigos para exibir na sidebar
             if not st.session_state.article_sources:
-                st.session_state.article_sources = sorted(set(
-                    doc.metadata.get("source", "")
-                    for doc in vectorstore.docstore._dict.values()
-                    if doc.metadata.get("source")
-                ))
+                def _year_key(name: str) -> int:
+                    m = re.search(r'\b(19|20)\d{2}\b', name)
+                    return int(m.group()) if m else 9999
+
+                st.session_state.article_sources = sorted(
+                    set(
+                        doc.metadata.get("source", "")
+                        for doc in vectorstore.docstore._dict.values()
+                        if doc.metadata.get("source")
+                    ),
+                    key=_year_key
+                )
                 st.rerun()
     except Exception as e:
         st.error(f"Erro ao conectar: {e}")
