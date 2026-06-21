@@ -31,7 +31,7 @@ docs = load_all_pdfs(ARTIGOS_DIR)
 print(f"✅ {len(docs)} artigos carregados.")
 
 print("✂️ Dividindo em chunks...")
-chunks = split_documents(docs, chunk_size=1000, chunk_overlap=200)
+chunks = split_documents(docs, chunk_size=1500, chunk_overlap=400)
 print(f"✅ {len(chunks)} chunks criados.")
 
 print("🧠 Gerando embeddings e criando índice FAISS...")

@@ -1,6 +1,6 @@
 """
-Pipeline RAG com histórico de conversa.
-Fluxo: condensa pergunta + histórico → retrieval → resposta com contexto.
+Pipeline RAG com histórico de conversa e multi-query retrieval.
+Fluxo: condensa pergunta + histórico → multi-query retrieval → resposta com contexto.
 """
 import os
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -10,8 +10,6 @@ from langchain_core.prompts import PromptTemplate
 
 # ── Prompts ──────────────────────────────────────────────────────────────
 
-# 1) Condensa a pergunta atual + histórico em uma pergunta autônoma.
-#    Isso resolve referências como "esse assunto", "ele", "continue"…
 CONDENSE_TEMPLATE = """Dado o histórico da conversa abaixo e a nova pergunta do usuário,
 reformule a pergunta como uma pergunta completamente autônoma (sem pronomes ou referências
 implícitas ao histórico). Se a pergunta já for autônoma, retorne-a sem alteração.
@@ -23,7 +21,16 @@ Nova pergunta: {question}
 
 Pergunta autônoma:"""
 
-# 2) Responde usando os trechos recuperados + histórico completo (para coerência).
+# Gera variações da pergunta para cobrir mais ângulos nos artigos
+MULTI_QUERY_TEMPLATE = """Você é um assistente de pesquisa acadêmica em comportamento do consumidor.
+Dada a pergunta abaixo, escreva 2 reformulações alternativas que busquem aspectos
+diferentes ou complementares do mesmo tema em uma base de artigos científicos.
+Retorne apenas as 2 reformulações, uma por linha, sem numeração ou prefixos.
+
+Pergunta: {question}
+
+Reformulações:"""
+
 ANSWER_TEMPLATE = """Você é um assistente acadêmico especializado em comportamento do consumidor.
 
 Você tem acesso a trechos de artigos acadêmicos (listados abaixo) e também ao seu conhecimento geral sobre a área.
@@ -53,7 +60,7 @@ def get_llm(api_key: str) -> ChatOpenAI:
         openai_api_key=api_key,
         model="gpt-4o-mini",
         temperature=0.3,
-        max_tokens=2000
+        max_tokens=4000
     )
 
 
@@ -68,8 +75,8 @@ def load_vectorstore(vectorstore_path: str, embeddings: OpenAIEmbeddings) -> FAI
 def create_qa_chain(vectorstore: FAISS, llm: ChatOpenAI) -> dict:
     """Retorna um dict com o retriever e o LLM prontos para uso conversacional."""
     retriever = vectorstore.as_retriever(
-        search_type="mmr",          # diversidade: evita k trechos do mesmo artigo
-        search_kwargs={"k": 10, "fetch_k": 25, "lambda_mult": 0.6}
+        search_type="mmr",
+        search_kwargs={"k": 10, "fetch_k": 40, "lambda_mult": 0.5}
     )
     return {"retriever": retriever, "llm": llm}
 
@@ -81,12 +88,37 @@ def _format_history(messages: list) -> str:
     lines = ["Histórico da conversa:"]
     for msg in messages:
         role = "Usuário" if msg["role"] == "user" else "Assistente"
-        # Trunca respostas longas para não explodir o contexto
         content = msg["content"]
-        if len(content) > 1200:
-            content = content[:1200] + "…"
+        if len(content) > 2000:
+            content = content[:2000] + "…"
         lines.append(f"{role}: {content}")
     return "\n".join(lines) + "\n\n"
+
+
+def _multi_query_docs(retriever, llm, question: str) -> list:
+    """
+    Gera 2 reformulações da pergunta via LLM e une os chunks
+    recuperados pelas 3 buscas (original + 2 variações), deduplicados.
+    Fallback para busca simples se a geração falhar.
+    """
+    try:
+        raw = llm.invoke(MULTI_QUERY_TEMPLATE.format(question=question)).content.strip()
+        variants = [q.strip() for q in raw.split("\n") if q.strip()][:2]
+    except Exception:
+        variants = []
+
+    seen: set[str] = set()
+    docs: list = []
+    for q in [question] + variants:
+        try:
+            for doc in retriever.invoke(q):
+                key = doc.page_content[:100]
+                if key not in seen:
+                    seen.add(key)
+                    docs.append(doc)
+        except Exception:
+            continue
+    return docs
 
 
 def answer_question(
@@ -114,10 +146,9 @@ def answer_question(
         standalone = llm.invoke(condense_prompt).content.strip()
     else:
         standalone = question
-        history_str = ""
 
-    # 2) Recuperar chunks relevantes com a pergunta autônoma
-    docs = retriever.invoke(standalone)
+    # 2) Multi-query retrieval: 3 buscas MMR → chunks deduplicados
+    docs = _multi_query_docs(retriever, llm, standalone)
     context = "\n\n".join(doc.page_content for doc in docs)
 
     # 3) Responder com contexto + histórico
@@ -125,11 +156,10 @@ def answer_question(
     answer_prompt = ANSWER_TEMPLATE.format(
         chat_history=history_block,
         context=context,
-        question=question      # usa a pergunta original (mais natural)
+        question=question
     )
     answer = llm.invoke(answer_prompt).content.strip()
 
-    # Extrai fontes únicas
     sources = sorted({
         doc.metadata.get("source", "Desconhecido") for doc in docs
     })
